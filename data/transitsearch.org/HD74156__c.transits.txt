@@ -1,0 +1,12 @@
+ Predicted Transit Epochs: HD74156__ c
+
+ Predicted Duration of a Central Transit:    50.   Hours
+
+ Begin Transit Window           PREDICTED CENTRAL TRANSIT     End Transit Window
+                                     All Times UT
+
+                               HJD        Year M  D  H  M
+ 2456282.05 2012 12 20 13  7   2456498.33 2013  7 24 20  1   2456714.62 2014  2 26  2 54
+ 2458274.05 2018  6  4 13  7   2458565.33 2019  3 22 20  1   2458856.62 2020  1  8  2 54
+ 2460266.05 2023 11 17 13  7   2460632.33 2024 11 17 20  1   2460998.62 2025 11 19  2 54
+ 2462258.05 2029  5  1 13  7   2462699.33 2030  7 16 20  1   2463140.62 2031 10  1  2 54

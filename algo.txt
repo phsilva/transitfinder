@@ -1,0 +1,8 @@
+
+Table of planets with RA, DEC, pretty name, other data
+Table of transit intervals: planet, begin, middle, end
+
+For a given latitude, altitude, date range, find up to N eclipses
+observable at the given place at altitude higher than A for each available planet.
+
+
