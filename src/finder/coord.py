@@ -24,6 +24,9 @@ import re
 import sys
 from types import StringType, LongType, IntType, FloatType
 
+TWO_PI = 2.0 * math.pi
+PI_OVER_TWO = (math.pi / 2.0)
+
 
 # to allow use of Coord outside of Chimera
 
@@ -48,7 +51,6 @@ __all__ = ['Coord',
 
 
 State = Enum("HMS", "DMS", "D", "H", "R", "AS")
-
 
 class CoordUtil (object):
 
@@ -168,7 +170,7 @@ class CoordUtil (object):
         return c.strfcoord()
 
     @staticmethod
-    def strfcoord (c, format=None, add_sign=True):
+    def strfcoord (c, format=None, signed=True):
         """strfcoord acts like sprintf family, allowing arbitrary
         coordinate conversion to str following the given template
         format.
@@ -181,7 +183,7 @@ class CoordUtil (object):
         s[s]: seconds (can be float)
         s[h]: hours
 
-        if add_sign was True, decimal degrees will always begins with
+        if signed was True, decimal degrees will always begins with
         a sign (+ or -) and hours values will have a negative sign if
         needed. Note that 
 
@@ -267,10 +269,115 @@ class CoordUtil (object):
                     s=s, ss=s,
                     h=h, hh=h)
 
-        if add_sign:
+        if signed:
             return (sign_str+format) % subs
         else:
             return format % subs
+
+    @staticmethod
+    def coordToR(coord):
+        if isinstance(coord, Coord):
+            return float(coord.toR())
+        else:
+            return float(coord)
+    
+    @staticmethod
+    def makeValid0to360(coord):
+        coordR = CoordUtil.coordToR(coord)
+        coordR = coordR % TWO_PI
+        if coordR < 0.0:
+            coordR += TWO_PI
+        return Coord.fromR(coordR)
+    
+    @staticmethod
+    def makeValid180to180(coord):
+        coordR = CoordUtil.coordToR(coord)
+        coordR = coordR % TWO_PI
+        if coordR > math.pi:
+            coordR -= TWO_PI
+        if coordR < (- math.pi):
+            coordR += TWO_PI
+        return Coord.fromR(coordR)
+                
+    @staticmethod
+    def raToHa(ra, lst):
+        return Coord.fromR(CoordUtil.coordToR(lst) - CoordUtil.coordToR(ra))
+    
+    @staticmethod
+    def haToRa(ha, lst):
+        return Coord.fromR(CoordUtil.coordToR(lst) - CoordUtil.coordToR(ha))
+    
+#    #coordRotate adopted from sidereal.py
+#    #http://www.nmt.edu/tcc/help/lang/python/examples/sidereal/ims/
+    
+    @staticmethod
+    def coordRotate (x, y, z):
+        """Used to convert between equatorial and horizon coordinates.
+    
+          [ x, y, and z are angles in radians ->
+              return (xt, yt) where
+              xt=arcsin(sin(x)*sin(y)+cos(x)*cos(y)*cos(z)) and
+              yt=arccos((sin(x)-sin(y)*sin(xt))/(cos(y)*cos(xt))) ]
+        """
+        #-- 1 --
+        xt  =  math.asin (math.sin(x) * math.sin(y) +
+                      math.cos(x) * math.cos(y) * math.cos(z))
+        #-- 2 --
+        yt  =  math.acos ((math.sin(x) - math.sin(y) * math.sin(xt)) /
+                      (math.cos(y) * math.cos(xt)))
+        #-- 3 --
+        if  math.sin(z) > 0.0:
+            yt  =  TWO_PI - yt
+    
+        #-- 4 --
+        return (xt, yt)
+
+    #Great circle distance formulae:
+    # source http://wiki.astrogrid.org/bin/view/Astrogrid/CelestialCoordinates
+
+    @staticmethod
+    def hav(theta):
+        """haversine function, units = radians. Used in calculation of great
+        circle distance
+
+        @param theta: angle in radians
+        @type theta: number
+
+        @rtype: number
+        """
+        ans = (math.sin(0.5*theta))**2
+        return ans
+
+    @staticmethod
+    def ahav(x):
+        """archaversine function, units = radians. Used in calculation of great
+        circle distance
+
+        @type x: number
+        
+        @return: angle in radians
+        @rtype: number
+        """
+        ans = 2.0 * math.asin(math.sqrt(x))
+        return ans
+
+    @staticmethod
+    def gcdist(vec1, vec2):
+        """Input (ra,dec) vectors in radians;
+        output great circle distance in radians.
+
+        @param vec1,vec2: position in radians
+        @type vec1: number
+        @type vec2: number
+        
+        @rtype: great circle distance in radians
+        
+        @see: U{http://wiki.astrogrid.org/bin/view/Astrogrid/CelestialCoordinates}
+        """
+        ra1,dec1=vec1
+        ra2,dec2=vec2
+        ans=CoordUtil.ahav( CoordUtil.hav(dec1-dec2) + math.cos(dec1)*math.cos(dec2)*CoordUtil.hav(ra1-ra2) )
+        return ans
 
 
 class Coord (object):
@@ -394,7 +501,7 @@ class Coord (object):
                   State.D  : lambda d  : float(d),
                   State.H  : lambda h  : h*15.0,
                   State.R  : lambda r  : r * Coord.rad2deg,
-                  State.AS : lambda as : as/3600.0}
+                  State.AS : lambda AS : AS/3600.0}
     
     to_state = {State.HMS: CoordUtil.d2hms, 
                 State.DMS: CoordUtil.d2dms,
@@ -526,8 +633,8 @@ class Coord (object):
         else:
             return '%.2f' % self.get()
 
-    def strfcoord (self, format=None):
-        return CoordUtil.strfcoord(self, format)
+    def strfcoord (self, *args, **kwargs):
+        return CoordUtil.strfcoord(self, *args, **kwargs)
 
     #
     # primitive conversion
@@ -657,6 +764,7 @@ class Coord (object):
                 other = Coord.fromState(other, self.state)
             else:
                 other = Coord.fromState(other, State.D)
+
         return self.D <= other.D
 
     def __eq__ (self, other):

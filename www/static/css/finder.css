@@ -1,0 +1,118 @@
+
+body {
+ font-family: sans-serif;
+ font-size: 12pt;
+ background-color: #ccc;
+}
+
+h1 {
+ color: #3366cc;
+ font-size: 1.4em;
+}
+
+h2 {
+ font-size: 1.3em;
+}
+
+h3 {
+ font-size: 1.2em;
+}
+
+h1.title {
+   padding: 5px 0px;
+   margin: 0px;
+}
+#content {
+ min-width: 500px;
+ max-width: 900px;
+ 
+ margin: 10px auto;
+ background-color: #fff;
+ border: 1px solid #222;
+ padding: 10px 15px 20px;
+}
+
+#credits {
+ margin: auto;
+ color: black;
+ text-align: center;
+ font-size: 0.6em;
+}
+
+#location {
+ display: none;
+}
+
+#selection {
+ padding: 10px 0px;
+}
+
+#results {
+
+}
+
+#results h2 {
+ font-weight: normal;
+ font-size: 1.2em;
+}
+
+table.transits {
+ width: 90%;
+ margin: auto;
+ font-size: 0.9em;
+}
+
+table.transits thead th {
+ color: #999;
+ font-size: 0.7em;
+ text-align: left;
+}
+
+.date_range {
+ font-weight: bold;
+}
+
+h3.date_header {
+ width: 100%;
+ font-size: 0.9em;
+ color: #3366cc;
+ border-bottom: 1px solid #3366cc;
+ padding-top: 5px;
+}
+
+.date_header_year {
+ font-size: 0.7em;
+ color: #999;
+}
+
+td.planet {
+ width: 15%;
+}
+
+td.planet a {
+ text-decoration: none;
+ border-bottom: 1px dotted black;
+ font-weight: bold;
+ color: black;
+}
+
+td.planet a:visited {
+ color: black;
+}
+
+td.hour {
+ width: 10%;
+}
+
+td.observable {
+ width: 10%;
+}
+
+td.percent {
+ width: 10%
+}
+
+img.full {
+ border: 0px solid none;
+ vertical-align: middle;
+}

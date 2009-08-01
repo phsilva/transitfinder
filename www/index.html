@@ -1,100 +1,122 @@
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:py="http://genshi.edgewall.org/">
   <head>
-    <title>$title</title>
+    <title>Transit Finder</title>
   </head>
 
   <link rel="stylesheet" type="text/css" href="/static/css/ui.datepicker.css"/>
+  <link rel="stylesheet" type="text/css" href="/static/css/finder.css"/>
   
   <script src="/static/js/jquery-1.2.3.js"/>
   <script src="/static/js/ui.datepicker.js"></script>
 
   <script>
 
-        (function() {
-
-         window.Finder = {
-
-          begin: 0,
-          end: 0,
- 
-         };
-         
-
-        }());
-
         $(document).ready(function () {
 
-            $("#change_period").click(function () { $("#period_picker").datepicker('show');  });
-
-            function setDates (dateStr) {
-             var dates = $('#period_picker').datepicker('getDate'); console.dir(dates);
-             var dateFormat = $.datepicker.regional[''].dateFormat; 
-             Finder.begin = $.datepicker.formatDate(dateFormat, dates[0]);
-             Finder.end   = $.datepicker.formatDate(dateFormat, dates[1]);
-            }
-
-            $("#period_picker").datepicker({rangeSelect: true,
-            numberOfMonths: 2, dateFormat: 'yymmdd', onSelect: setDates});
-
-            $("#setPeriod").submit(function () {
-              window.location = "/finder/all/"; 
+            $("#setPeriod").submit(function() {
+                window.location = "/finder/"+$("#period").val();
+                return false;
             });
 
+            $("#setLocation").submit(function() {
+                window.location = "/finder/location/"+$("#longitude").val()+"/"+$("#latitude").val()+"/"+$("#altitude").val()+"/"+$("#offset").val();
+                return false;
+            });
 
-       });
+        });
 
   </script>
   
   <body>
 
-    <h1>Transit Finder</h1>
+    <div id="content">
 
-    <div id="location">
+      <h1 class="title">Transit Finder</h1>
 
-      <form id="setLocation">
+      <div id="location">
 
-        <label for="longitude">Longitude</label>
-        <input type="text" name="longitude" id="longitude" value="+/-dd mm ss"/>
+        <form id="setLocation">
 
-        <label for="latitude">Latitude</label>
-        <input type="text" name="latitude" id="latitude" value="dd mm ss"/>
+          <label for="longitude">Longitude</label>
+          <input type="text" name="longitude" id="longitude" value="+/-dd mm ss"/>
 
-        <label for="altitude">Altitude</label>
-        <input type="text" name="altitude" id="altitude" value="nnn.n"/>
+          <label for="latitude">Latitude</label>
+            <input type="text" name="latitude" id="latitude" value="dd mm ss"/>
 
-        <label for="offset">GMT Offset</label>
-        <input type="text" name="offset" id="offset" value="+/-H.H"/>
+              <label for="altitude">Altitude</label>
+              <input type="text" name="altitude" id="altitude" value="nnn.n"/>
 
-        <input type="submit" value="Set location..."/>
+                <label for="offset">GMT Offset</label>
+                <input type="text" name="offset" id="offset" value="+/-H.H"/>
 
-      </form>
+                  <input type="submit" value="Set location!"/>
 
-    </div>
+        </form>
 
-    <div id="selection">
+      </div>
 
-      <form id="setPeriod">
+      <div id="selection">
 
-        <label for="object">Planet</label>
-        <select name="object" id="object">
-          <option value="ALL">ALL</option>
-        </select>
+        <form id="setPeriod">
 
-        <input type="text" id="period_picker"/>
-        <span><a href="javascript:void(0)" id="change_period">[change period]</a></span>
+          <label for="period">find transits for</label>
+          <select name="period" id="period">
+            <option value="tonight">tonight</option>
+            <option value="this-week">next 7 days</option>
+            <option value="this-month">next 30 days</option>
+          </select>
 
+          <input type="submit" value="Find!"/>
 
-        <input type="submit" value="Search..."/>
+        </form>
 
-      </form>
+      </div>
 
-    </div>
+      <div class="error" py:if="error != None">
+        ${error}
+      </div>
 
-    
-    <h2>Transits for $target</h2>
-    <h3>From: $begin to $end</h3>
+      <div py:if="error is None" id="results">
 
-    <pre>$transits</pre>
+        <h2>Transits between <span class="date_range">${begin.strftime("%Y/%m/%d")}</span> and  <span class="date_range">${end.strftime("%Y/%m/%d")}</span></h2>
 
+        <p py:if="not days">
+          There are no transits observable for your location at this time.
+        </p>
+
+        <div py:for="day in days">
+          <h3 class="date_header">${day.strftime("%B %d")}<span class="date_header_year"> ${day.strftime("%Y")}</span></h3>
+
+          <table class="transits">
+
+            <thead>
+              <th>planet</th>
+              <th>begin</th>
+              <th>center</th>
+              <th>end</th>
+              <th>observable hours</th>
+              <th>% of total</th>
+            </thead>
+
+            <tr py:for="transit in transits[day]">
+              <td class="planet"><a href="http://simbad.u-strasbg.fr/simbad/sim-id?Ident=${transit.planet}">${transit.planet}</a></td>
+              <td class="hour">${transit.begin.strftime("%H:%M")}</td>
+              <td class="hour">${transit.center.strftime("%H:%M")}</td>
+              <td class="hour">${transit.end.strftime("%H:%M")}</td>
+              <td class="observable">${"%2.1f" % transit.observable}</td>
+              <td class="percent">${"%2.0f" % transit.percent} <span py:if="transit.percent == 100"><img class="full" src="/static/images/full.png"/></span></td>
+            </tr>
+
+          </table>
+          
+        </div>
+
+      </div>
+
+   </div>
+
+  <div id="credits">
+    (c) 2008 Paulo Henrique Silva (ph.silva at gmail dot com)
+  </div>
   </body>
 </html>

@@ -1,27 +1,16 @@
 
-have_coords = True
-
-try:
-    from coords import Position as CoordsPosition
-    from coords import astrodate
-    from coords import pytpm
-except ImportError:
-    class CoordsPosition(object): pass
-    have_coords = False
-
 # to allow use outsise chimera
-
 try:
-    from chimera.util.coord import Coord
+    from chimera.util.coord import Coord, CoordUtil
 except ImportError:
-    from coord import Coord
+    from coord import Coord, CoordUtil
 
 try:
     from chimera.util.enum  import Enum
 except ImportError:
     from enum import Enum
 
-
+import ephem
 from types import StringType
 
 
@@ -37,7 +26,7 @@ class PositionOutsideLimitsError (Exception):
     pass
 
 
-class Position (CoordsPosition):
+class Position (object):
     """Position represents a coordinate pair in a reference frame.
 
     There are five factories available, that can be used to create
@@ -98,7 +87,7 @@ class Position (CoordsPosition):
     """
 
     @staticmethod
-    def fromRaDec (ra, dec, equinox=Equinox.J2000):
+    def fromRaDec (ra, dec, equinox=Equinox.J2000, epoch=Epoch.J2000):
 
         try:
             if type(ra) == StringType:
@@ -115,7 +104,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(ra), 0, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid RA coordinate %s (%s)" % (str(ra), e))
+            raise ValueError("Invalid RA coordinate %s" % str(ra))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid RA range %s. Must be between 0-24 hours or 0-360 deg." % str(ra))
 
@@ -134,14 +123,14 @@ class Position (CoordsPosition):
             Position._checkRange(float(dec), -90, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid DEC coordinate %s (%s)" % (str(dec), e))
+            raise ValueError("Invalid DEC coordinate %s" % str(dec))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid DEC range %s. Must be between 0-360 deg or -90 - +90 deg." % str(dec))
 
-        return Position((ra, dec), system=System.CELESTIAL, equinox=equinox)
+        return Position((ra, dec), system=System.CELESTIAL, equinox=equinox, epoch=epoch)
 
     @staticmethod
-    def fromAzAlt (az, alt):
+    def fromAltAz (alt, az):
         try:
             if not isinstance(az, Coord):
                 az = Coord.fromDMS(az)
@@ -151,7 +140,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(az), -180, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid AZ coordinate %s (%s)" % (str(az), e))
+            raise ValueError("Invalid AZ coordinate %s" % str(az))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid AZ range %s. Must be between 0-360 deg or -180 - +180 deg." % str(az))
 
@@ -164,11 +153,11 @@ class Position (CoordsPosition):
             Position._checkRange(float(alt), -90, 180)
 
         except ValueError, e:
-            raise ValueError("Invalid ALT coordinate %s (%s)" % (str(alt), e))
+            raise ValueError("Invalid ALT coordinate %s" % str(alt))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid ALT range %s. Must be between 0-180 deg or -90 - +90 deg." % str(alt))
 
-        return Position((az, alt), system=System.TOPOCENTRIC)
+        return Position((alt, az), system=System.TOPOCENTRIC)
 
     @staticmethod
     def fromLongLat (long, lat):
@@ -193,7 +182,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(long), -180, 360)
 
         except ValueError, e:
-            raise ValueError("Invalid LONGITUDE coordinate %s (%s)" % (str(long), e))
+            raise ValueError("Invalid LONGITUDE coordinate %s" % str(long))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid LONGITUDE range %s. Must be between 0-360 deg or -180 - +180 deg." % str(long))
 
@@ -206,7 +195,7 @@ class Position (CoordsPosition):
             Position._checkRange(float(lat), -90, 180)
 
         except ValueError, e:
-            raise ValueError("Invalid LATITUDE coordinate %s (%s)" % (str(lat), e))
+            raise ValueError("Invalid LATITUDE coordinate %s" % str(lat))
         except PositionOutsideLimitsError:
             raise ValueError("Invalid LATITUDE range %s. Must be between 0-180 deg or -90 - +90 deg." % str(lat))
 
@@ -214,6 +203,10 @@ class Position (CoordsPosition):
 
     @staticmethod
     def _checkRange(value, lower, upper):
+        # handle -0 problem.
+        if abs(value) == 0.0:
+            value = abs(value)
+
         if not (lower <= value <= upper):
             raise PositionOutsideLimitsError("Value must between %s and %s." % (lower, upper))
         return True
@@ -221,52 +214,31 @@ class Position (CoordsPosition):
 
     def __init__(self, coords,
                  equinox=Equinox.J2000,
+                 epoch=Epoch.J2000,
                  system=System.CELESTIAL):
 
         self._coords = coords
-        self._internal = tuple(float(c.toD()) for c in self.coords)
-
         self.system = str(system).lower()
-        self.units  = 'degrees'
+        self.epoch = epoch
 
         try:
             self.equinox = str(equinox).lower()
         except:
             self.equinox = equinox #to support arbitrary equinoxes
 
-        if have_coords:
-            self._set_tpmstate()
-
-    def __getinitargs__ (self):
-        return (self._coords, self.equinox, self.system)
-
-    def _set_tpmstate(self):
-        """ Define the state for TPM based on equinox and system """
-        if self.system == 'galactic':
-            self._tpmstate=4
-            self._tpmequinox=astrodate.BesselDate(1958.0).jd
-        elif self.system == 'ecliptic':
-            self._tpmstate=3
-            self._tpmequinox=astrodate.JulianDate(1984.0).jd
-        elif self.system == 'celestial':
-            if self.equinox == 'j2000':
-                self._tpmstate=6
-                self._tpmequinox=pytpm.j2000
-            elif self.equinox == 'b1950':
-                self._tpmstate=5
-                self._tpmequinox=pytpm.b1950
-            else: #arbitrary equinox. assume FK5 for now, but this is bad.
-                self._tpmstate=2
-                self._tpmequinox=astrodate.JulianDate(self.equinox).jd
-        elif self.system == "topocentric":
-            self._tpmstate=19
-            self._tpmequinox=pytpm.j2000
-        
     def __repr__(self):
         """
         @rtype: string
         """
         return self.__str__()
+
+    def epochString(self):
+        if self.epoch == Epoch.J2000:
+            return "J2000.0"
+        elif self.epoch == Epoch.B1950:
+            return "B1950.0"
+        else:
+            return "J%.2f" % (2000.0 + (ephem.julian_date() - 2451545.0) / 365.25)
 
     def __str__(self):
         """
@@ -276,18 +248,17 @@ class Position (CoordsPosition):
 
     # -* conversions -*
 
-
     # Coord conversion
     coords = property(lambda self: self._coords)
 
-    def __tuple__ (self):
-        return tuple(self.coords)
+    def __iter__ (self):
+        return self.coords.__iter__()
 
     ra  = property(lambda self: self._coords[0])
     dec = property(lambda self: self._coords[1])
-    
-    az  = property(lambda self: self._coords[0])
-    alt = property(lambda self: self._coords[1])
+
+    alt = property(lambda self: self._coords[0])
+    az  = property(lambda self: self._coords[1])
 
     long = property(lambda self: self._coords[0])
     lat  = property(lambda self: self._coords[1])
@@ -303,3 +274,82 @@ class Position (CoordsPosition):
 
     def rad (self):
         return self.R
+
+    def toEphem(self):
+        if str(self.epoch).lower() == str(Epoch.J2000).lower():
+            epoch = ephem.J2000
+        elif str(self.epoch).lower() == str(Epoch.B1950).lower():
+            epoch = ephem.B1950
+        else:
+            epoch = ephem.now()
+            
+        return ephem.Equatorial(self.ra.R, self.dec.R, epoch=epoch)
+
+    def precess(self, epoch=Epoch.NOW):
+        if str(epoch).lower() == str(Epoch.J2000).lower():
+            epoch = ephem.J2000
+        elif str(epoch).lower() == str(Epoch.B1950).lower():
+            epoch = ephem.B1950
+        elif str(epoch).lower() == str(Epoch.NOW).lower():
+            epoch = ephem.now()
+
+        j2000 = self.toEphem()
+        now = ephem.Equatorial(j2000, epoch=epoch)
+        return Position.fromRaDec(Coord.fromR(now.ra), Coord.fromR(now.dec), epoch=Epoch.NOW)
+
+    #
+    # great circle distance
+    #
+    def angsep(self, other):
+        """
+        Calculate the Great Circle Distance from other.
+
+        @param other: position to calculate distance from.
+        @type  other: L{Position}
+
+        @returns: The distance from this point to L{other}.
+        @rtype: L{Coord} in degress (convertable, as this is a Coord).
+        """
+        return Coord.fromR(CoordUtil.gcdist(self.R, other.R)).toD()
+
+    def within(self, other, eps=Coord.fromAS(60)):
+        """
+        Returns wether L{other} is up to L{eps} units from this
+        points. (using great circle distance).
+
+        @param other: Same as in angsep.
+        @type  other: L{Position}.
+
+        @param eps: Limit distance.
+        @type  eps: L{Coord}.
+
+        @returns: Wether L{other} is within {eps} units from this point.
+        @rtype: bool
+        """
+        return (self.angsep(other) <= eps)
+        
+    # raDecToAltAz and altAzToRaDec adopted from sidereal.py
+    # http://www.nmt.edu/tcc/help/lang/python/examples/sidereal/ims/
+                
+    @staticmethod
+    def raDecToAltAz(raDec, latitude, lst):
+        decR = CoordUtil.coordToR(raDec.dec)
+        latR = CoordUtil.coordToR(latitude)
+        ha = CoordUtil.raToHa(raDec.ra, lst)
+        haR = CoordUtil.coordToR(ha)
+        
+        altR,azR = CoordUtil.coordRotate(decR, latR, haR)
+        
+        return Position.fromAltAz(Coord.fromR(CoordUtil.makeValid180to180(altR)), Coord.fromR(CoordUtil.makeValid0to360(azR)))
+    
+    @staticmethod
+    def altAzToRaDec(altAz, latitude, lst):
+        altR = CoordUtil.coordToR(altAz.alt)
+        latR = CoordUtil.coordToR(latitude)
+        azR = CoordUtil.coordToR(altAz.az)
+        
+        decR,haR = CoordUtil.coordRotate(altR, latR, azR)
+        
+        ra = CoordUtil.haToRa(haR, lst)
+        
+        return Position.fromRaDec(CoordUtil.makeValid0to360(ra), CoordUtil.makeValid180to180(decR))

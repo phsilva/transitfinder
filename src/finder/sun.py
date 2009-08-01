@@ -2,8 +2,9 @@
 # -*- coding: iso-8859-1 -*-
 
 import ephem
+from coord import Coord
+
 import datetime as dt
-from coords.position import dms
 
 
 class Sun (object):
@@ -14,19 +15,22 @@ class Sun (object):
 
     def _makeEphemSite(self, date):
         site = ephem.Observer()
-        site.lat = '%s%d:%d:%.2f' % dms(self.site['lat'])
-        site.lon = '%s%d:%d:%.2f' % dms(self.site['lon'])
-        site.alt = self.site['alt']
-        site.date= date
+        
+        site.lat = Coord.fromD(self.site["lat"]).strfcoord('%(d)02d:%(m)02d:%(s).2f', signed=True)
+        site.long = Coord.fromD(self.site["lon"]).strfcoord('%(d)02d:%(m)02d:%(s).2f', signed=True)
+        site.elevation = self.site["alt"]
+        site.date = date
         return site
 
     def getSunrise(self, date):
-        self.sun.compute(self._makeEphemSite(date))
-        return self.sun.rise_time.datetime()
+        observer = self._makeEphemSite(date)
+        self.sun.compute(observer)
+        return observer.next_rising(self.sun).datetime()
 
     def getSunset(self, date):
-        self.sun.compute(self._makeEphemSite(date))
-        return self.sun.set_time.datetime()
+        observer = self._makeEphemSite(date)
+        self.sun.compute(observer)
+        return observer.next_setting(self.sun).datetime()
 
     def getTimes(self, date):
         return (self.getSunrise(date), self.getSunset(date))

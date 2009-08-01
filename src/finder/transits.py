@@ -1,11 +1,13 @@
 #! /usr/bin/env python
 #! -*- coding: utf-8 -*-
 
+import numpy as N
+
 import re
 import time
 import sys
+from itertools import izip
 
-import numpy as N
 
 class Transits (object):
     """
@@ -36,7 +38,6 @@ class Transits (object):
         transits_begin  = N.zeros(len(lines[8:]), dtype=N.int32)
         transits_center = N.zeros(len(lines[8:]), dtype=N.int32)
         transits_end    = N.zeros(len(lines[8:]), dtype=N.int32)
-        transits_obs    = N.ones(len(lines[8:]), dtype=N.float32)        
 
         splitre = re.compile("\d+\.\d+")
 
@@ -56,7 +57,6 @@ class Transits (object):
         t.begin  = transits_begin 
         t.center = transits_center
         t.end    = transits_end
-        t.observable = transits_obs
         t.duration   = t.end[0] - t.begin[0]
 
         return t
@@ -65,10 +65,10 @@ class Transits (object):
     def copy (transits, mask):
         t = Transits()
         t.duration = transits.duration
+
         t.begin    = transits.begin[mask]
         t.center   = transits.center[mask]
         t.end      = transits.end[mask]
-        t.observable = transits.observable[mask]
 
         return t
 
@@ -85,7 +85,8 @@ class Transits (object):
         self.center  = None
         self.end     = None
 
-        self.observable = None
+    def __iter__ (self):
+        return izip(self.begin, self.center, self.end)
 
 
         
