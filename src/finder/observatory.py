@@ -6,7 +6,7 @@ from matplotlib.dates import HourLocator, DateFormatter, date2num
 
 import numpy as N
 
-import novas
+from novas import compat as novas
 from sun import Sun
 
 from dateutil.rrule import *
@@ -31,10 +31,9 @@ def datetime2mjd (t=None):
 def datetime2seconds (t):
     return time.mktime(t.timetuple())
 
-def equ2alt (site, mjd, ra, dec):
-    zd, az, rar, decr = novas.equ2hor (mjd, 0, 0, 0, site,
-                                       ra, dec, 0)
-    return 90 - zd
+def equ2alt (observer, mjd, ra, dec):
+    topo_az_zd, _ = novas.equ2hor (mjd, 0, 0, 0, observer, ra, dec, 0)
+    return 90 - topo_az_zd[0]
 
 
 class Observatory (object):
@@ -91,7 +90,7 @@ class Observatory (object):
 
         start_mjd = datetime2mjd(start_ut)
         end_mjd   = datetime2mjd(end_ut)
-        
+
         print >> log, "="*80
         print >> log, "Start time (local):", start_local
         print >> log, "End time   (local):", end_local
@@ -104,9 +103,9 @@ class Observatory (object):
         print >> log, "Start time (MJD)  :", start_mjd
         print >> log, "End time   (MJD)  :", end_mjd
 
-        novas = self._getNovas()
+        observer = self.getObserver()
 
-        sun = Sun({"lat": novas.latitude, "lon": novas.longitude, "alt": novas.height})
+        sun = Sun({"lat": observer.latitude, "lon": observer.longitude, "alt": observer.height})
 
         # spanning days
         day = list(rrule(DAILY, dtstart=start_ut, until=end_ut))
@@ -135,8 +134,8 @@ class Observatory (object):
 
         alt = []
         for obj in objects:
-            alt.append(N.array(map(lambda mjd: equ2alt(novas, mjd, obj.ra.H, obj.dec.D), mjd)))
-            
+            alt.append(N.array(map(lambda mjd: equ2alt(observer, mjd, obj.ra.H, obj.dec.D), mjd)))
+
         if by_night:
             observables = N.zeros((len(objects), len(day)-1))
         else:
@@ -151,13 +150,13 @@ class Observatory (object):
 
             dark_begin_local = sunset[day[i]]
             dark_end_local = sunrise[day[i+1]]
-            
+
             dark_begin_ut = dark_begin_local.astimezone(tz.tzutc())
             dark_end_ut = dark_end_local.astimezone(tz.tzutc())
-            
+
             dark_begin_mjd = datetime2mjd(dark_begin_ut)
             dark_end_mjd = datetime2mjd(dark_end_ut)
-            
+
             dark = (mjd >= dark_begin_mjd) & (mjd <= dark_end_mjd)
 
             print >> log, "[%s]" % day[i].astimezone(self.local_tz).date(), \
@@ -167,7 +166,7 @@ class Observatory (object):
             print >> log
 
             for j, obj in enumerate(objects):
-                
+
                 observable = (alt[j] >= min_alt) & dark
                 observable_hrs = (sum(observable)*10)/60.
 
@@ -198,7 +197,7 @@ class Observatory (object):
     def plot (self, filename=None):
 
         for i, obj in enumerate(self._last_objects):
-            
+
             P.figure(i)
 
             P.plot_date(self._last_ut, self._last_alt[i], xdate=True, fmt='-')
@@ -215,19 +214,18 @@ class Observatory (object):
             P.xlabel("Local Hours")
             P.ylabel("Altitude")
             P.title("%s - %s" % (self._last_begin_local.date(), obj))
-            
+
             P.ylim(ymin=0, ymax=90)
             P.xlim(xmin=date2num(self._last_begin_local), xmax=date2num(self._last_end_local))
 
             P.show()
 
-    def _getNovas (self):
-        site = novas.site_info()
-        site.latitude = self.location.lat.D
-        site.longitude = self.location.long.D
-        site.height = self.altitude
-        return site
-
+    def getObserver (self):
+        observer = novas.OnSurface()
+        observer.latitude = self.location.lat.D
+        observer.longitude = self.location.long.D
+        observer.height = self.altitude
+        return observer
 
 
 if __name__ == "__main__":
@@ -240,7 +238,3 @@ if __name__ == "__main__":
                           parse("2008/06/04 20:59"),  parse("2008/06/04 22:51"), 30)
 
     lna.plot()
-
-    
-    
-    
